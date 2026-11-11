@@ -26,8 +26,12 @@ class Complaint extends Model
         'reporter_id',
         'description',
         'photo_path',
+        'file_path',
         'status_repair',
         'handler_id',
+        'handler_photo_path',
+        'handler_file_path',
+        'handler_note',
         'reported_at',
     ];
 

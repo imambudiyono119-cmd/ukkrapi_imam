@@ -1,7 +1,7 @@
 @extends('layouts.guest')
 
 @section('content')
-    <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-6">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-5 sm:p-6">
         <h1 class="text-2xl font-bold mb-2">Login RAPI-Sekolah</h1>
         <p class="text-sm text-slate-500 mb-6">Masuk ke dashboard sesuai role Anda.</p>
 

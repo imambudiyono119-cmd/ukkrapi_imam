@@ -19,7 +19,7 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:6,1')->name('login.submit');
     Route::get('/lupa-password', [AuthController::class, 'showForgotPassword'])->name('password.request');
     Route::post('/lupa-password', [AuthController::class, 'sendResetLink'])->middleware('throttle:6,1')->name('password.email');
-    Route::get('/reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
+    Route::get('/reset-password/{token?}', [AuthController::class, 'showResetPassword'])->name('password.reset');
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:6,1')->name('password.update');
 });
 
@@ -31,6 +31,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/events', [EventController::class, 'store'])
         ->middleware('role:Waka/Admin,Guru,Organisasi,Guru/Organisasi')
         ->name('events.store');
+    Route::delete('/events/{event}', [EventController::class, 'destroy'])->name('events.destroy');
 
     Route::get('/complaints', [ComplaintController::class, 'index'])->name('complaints.index');
     Route::post('/complaints', [ComplaintController::class, 'store'])->name('complaints.store');

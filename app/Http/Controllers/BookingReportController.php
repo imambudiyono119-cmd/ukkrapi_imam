@@ -41,13 +41,40 @@ class BookingReportController extends Controller
         $validated = $request->validate([
             'month' => ['sometimes', 'required', 'date_format:Y-m'],
             'search' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'download' => ['sometimes', 'in:csv'],
+            'download' => ['sometimes', 'in:csv,excel,print'],
         ]);
         $month = $validated['month'] ?? now()->format('Y-m');
         $monthStart = CarbonImmutable::createFromFormat('!Y-m', $month);
 
         $query = $this->approvedEventsQuery($validated['search'] ?? '')
             ->whereBetween('date', [$monthStart->toDateString(), $monthStart->endOfMonth()->toDateString()]);
+
+        if (($validated['download'] ?? null) === 'excel') {
+            $events = $query->orderBy('date')->orderBy('start_time')->orderBy('id')->get();
+
+            return response()->streamDownload(function () use ($events, $monthStart): void {
+                echo view('reports.excel', [
+                    'events' => $events,
+                    'monthStart' => $monthStart,
+                ])->render();
+            }, 'laporan-peminjaman-'.$month.'.xls', [
+                'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="laporan-peminjaman-'.$month.'.xls"',
+                'Cache-Control' => 'max-age=0',
+            ]);
+        }
+
+        if (($validated['download'] ?? null) === 'print') {
+            $events = $query->orderBy('date')->orderBy('start_time')->orderBy('id')->get();
+
+            return view('reports.print', [
+                'events' => $events,
+                'periodLabel' => $monthStart->format('m-Y'),
+                'monthStart' => $monthStart,
+                'search' => $validated['search'] ?? '',
+                'title' => 'Laporan Peminjaman Bulanan',
+            ]);
+        }
 
         if (($validated['download'] ?? null) === 'csv') {
             return response()->streamDownload(function () use ($query): void {

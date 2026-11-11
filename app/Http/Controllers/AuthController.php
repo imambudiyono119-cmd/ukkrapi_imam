@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -31,16 +34,36 @@ class AuthController extends Controller
             'email' => ['required', 'email'],
         ]);
 
-        Password::sendResetLink($request->only('email'));
+        $user = User::where('email', $request->email)->first();
 
-        return back()->with('status', 'Jika email terdaftar, tautan untuk mengatur ulang kata sandi akan dikirim.');
+        if (! $user) {
+            return back()->with('status', 'Jika email terdaftar, tautan dan kode OTP untuk mengatur ulang kata sandi akan dikirim.');
+        }
+
+        $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $token = Password::broker()->createToken($user);
+
+        DB::table('password_reset_tokens')->where('email', $user->email)->update([
+            'otp' => $otp,
+        ]);
+
+        try {
+            $user->sendPasswordResetNotification($token);
+            $message = 'Kode OTP dan tautan reset telah dikirim ke email Anda. Silakan periksa email dan masukkan kode OTP di bawah.';
+        } catch (\Throwable $e) {
+            Log::error('SMTP Error sending password reset notification: '.$e->getMessage());
+            $message = 'Kode OTP telah dibuat: '.$otp.' (SMTP lokal belum terhubung, kode ditampilkan untuk pengujian).';
+        }
+
+        return redirect()->route('password.reset', ['email' => $user->email])
+            ->with('status', $message);
     }
 
-    public function showResetPassword(Request $request, string $token): View
+    public function showResetPassword(Request $request, ?string $token = null): View
     {
         return view('auth.reset-password', [
             'email' => $request->query('email'),
-            'token' => $token,
+            'token' => $token ?? $request->query('token', ''),
         ]);
     }
 
@@ -52,6 +75,39 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
+        $inputToken = trim($credentials['token']);
+        $user = User::where('email', $credentials['email'])->first();
+
+        if (! $user) {
+            return back()->withErrors(['email' => 'Akun dengan email ini tidak ditemukan.']);
+        }
+
+        // Cek apakah token yang dimasukkan adalah kode OTP 6 digit
+        $record = DB::table('password_reset_tokens')->where('email', $user->email)->first();
+        $isOtpValid = false;
+
+        if ($record && ! empty($record->otp) && $record->otp === $inputToken) {
+            $isNotExpired = Carbon::parse($record->created_at)->addMinutes(60)->isFuture();
+            if ($isNotExpired) {
+                $isOtpValid = true;
+            }
+        }
+
+        if ($isOtpValid) {
+            $user->forceFill([
+                'password' => Hash::make($credentials['password']),
+            ])->setRememberToken(Str::random(60));
+
+            $user->save();
+
+            DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+
+            event(new PasswordReset($user));
+
+            return redirect()->route('login')->with('status', 'Kata sandi berhasil diatur ulang. Silakan masuk.');
+        }
+
+        // Verifikasi menggunakan broker standar Laravel jika token bukan OTP plain
         $status = Password::reset($credentials, function (User $user, string $password): void {
             $user->forceFill([
                 'password' => Hash::make($password),
@@ -66,7 +122,7 @@ class AuthController extends Controller
             return redirect()->route('login')->with('status', 'Kata sandi berhasil diatur ulang. Silakan masuk.');
         }
 
-        return back()->withErrors(['email' => 'Tautan reset tidak valid atau sudah kedaluwarsa.']);
+        return back()->withErrors(['email' => 'Kode OTP atau tautan reset tidak valid atau sudah kedaluwarsa.']);
     }
 
     public function login(Request $request): RedirectResponse

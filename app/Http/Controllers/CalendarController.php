@@ -33,6 +33,28 @@ class CalendarController extends Controller
             })
             ->get()
             ->map(function ($event) {
+                $bookerRole = 'Umum';
+                $bookerType = 'umum';
+                $color = '#0284c7';
+                $borderColor = '#0369a1';
+
+                if ($event->pic?->isAdmin()) {
+                    $bookerRole = 'Waka/Admin';
+                    $bookerType = 'waka';
+                    $color = '#4f46e5'; // Indigo untuk Waka
+                    $borderColor = '#3730a3';
+                } elseif ($event->pic?->isTeacher() || $event->pic?->role?->role_name === 'Guru') {
+                    $bookerRole = 'Guru';
+                    $bookerType = 'guru';
+                    $color = '#0284c7'; // Biru untuk Guru
+                    $borderColor = '#0369a1';
+                } elseif ($event->pic?->isStudent() || $event->pic?->isOrganization() || in_array($event->pic?->role?->role_name, ['Organisasi', 'Siswa/Tamu'], true)) {
+                    $bookerRole = 'Siswa / Organisasi';
+                    $bookerType = 'siswa';
+                    $color = '#059669'; // Hijau untuk Siswa/OSIS
+                    $borderColor = '#047857';
+                }
+
                 $calendarEvent = [
                     'id' => $event->id,
                     'title' => $event->event_name,
@@ -44,6 +66,12 @@ class CalendarController extends Controller
                     'start_time' => $event->start_time,
                     'end_time' => $event->end_time,
                     'status' => $event->status,
+                    'backgroundColor' => $color,
+                    'borderColor' => $borderColor,
+                    'textColor' => '#ffffff',
+                    'booker_type' => $bookerType,
+                    'booker_role' => $bookerRole,
+                    'classNames' => ['event-'.$bookerType],
                 ];
 
                 if (! $event->pic?->isAdmin()) {
@@ -52,6 +80,8 @@ class CalendarController extends Controller
 
                 if (auth()->check()) {
                     $calendarEvent['report_url'] = route('complaints.index', ['event_id' => $event->id]);
+                    $calendarEvent['can_cancel'] = auth()->user()->isAdmin() || $event->pic_id === auth()->id();
+                    $calendarEvent['cancel_url'] = route('events.destroy', $event);
                 }
 
                 return $calendarEvent;

@@ -4,6 +4,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 
@@ -174,4 +175,28 @@ test('login shows the requested message when credentials are incorrect', functio
         ])
         ->assertOk()
         ->assertSeeText('Password salah bos.');
+});
+
+test('user can reset password using 6-digit otp', function () {
+    $this->post(route('password.email'), ['email' => $this->guru->email])
+        ->assertRedirect(route('password.reset', ['email' => $this->guru->email]))
+        ->assertSessionHas('status');
+
+    $otpRecord = DB::table('password_reset_tokens')
+        ->where('email', $this->guru->email)
+        ->first();
+
+    expect($otpRecord)->not->toBeNull()
+        ->and($otpRecord->otp)->toMatch('/^\d{6}$/');
+
+    $this->post(route('password.update'), [
+        'token' => $otpRecord->otp,
+        'email' => $this->guru->email,
+        'password' => 'NewPassword123',
+        'password_confirmation' => 'NewPassword123',
+    ])
+        ->assertRedirect(route('login'))
+        ->assertSessionHas('status', 'Kata sandi berhasil diatur ulang. Silakan masuk.');
+
+    expect(Hash::check('NewPassword123', $this->guru->fresh()->password))->toBeTrue();
 });

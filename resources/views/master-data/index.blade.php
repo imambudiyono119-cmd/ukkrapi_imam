@@ -40,14 +40,20 @@
                     <input id="password_confirmation" type="password" name="password_confirmation" autocomplete="new-password" required class="w-full rounded-lg border px-3 py-2">
                 </div>
                 <div class="flex items-end">
-                    <button type="submit" class="rounded-lg bg-sky-700 px-4 py-2 font-semibold text-white hover:bg-sky-800">Tambah anggota</button>
+                    <button type="submit" class="w-full sm:w-auto rounded-lg bg-sky-700 px-5 py-2.5 font-semibold text-white hover:bg-sky-800 transition text-center shadow-xs">Tambah anggota</button>
                 </div>
             </form>
         </section>
 
         <section class="overflow-hidden rounded-2xl bg-white shadow-sm">
-            <div class="border-b px-5 py-4">
+            <div class="border-b px-5 py-4 flex items-center justify-between">
                 <h2 class="text-lg font-bold">Daftar anggota</h2>
+            </div>
+            <div class="sm:hidden px-4 pt-3 text-xs text-slate-500 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                </svg>
+                <span>Geser tabel ke samping untuk melihat opsi kelola</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-slate-200 text-left text-sm">

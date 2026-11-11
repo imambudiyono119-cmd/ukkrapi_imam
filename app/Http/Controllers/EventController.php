@@ -34,6 +34,25 @@ class EventController extends Controller
                 ->withInput();
         }
 
+        // Aturan H-3 jam: Peminjaman harus diajukan minimal 3 jam sebelum waktu mulai kegiatan (tidak bisa mendadak)
+        $eventStartDateTime = CarbonImmutable::parse($validated['date'].' '.$validated['start_time']);
+        if (! $user->isAdmin() && $eventStartDateTime->isBefore(now()->addHours(3))) {
+            return back()
+                ->withErrors(['start_time' => 'Peminjaman harus diajukan minimal H-3 jam sebelum waktu mulai kegiatan (tidak bisa langsung).'])
+                ->withInput();
+        }
+
+        // Pembatasan jam peminjaman:
+        // Guru dan Waka dapat meminjam kapan saja termasuk malam hari dan hingga 24 jam penuh (00:00 - 23:59).
+        // Siswa / Organisasi hanya dapat meminjam pada jam sekolah & ekstrakurikuler (07:00 - 17:30).
+        if (! $user->isAdmin() && ! $user->isTeacher()) {
+            if ($validated['start_time'] < '07:00' || $validated['end_time'] > '17:30') {
+                return back()
+                    ->withErrors(['start_time' => 'Siswa / Organisasi hanya dapat meminjam fasilitas pada jam sekolah dan ekstrakurikuler (07:00 - 17:30). Peminjaman malam hari atau 24 jam hanya dapat diajukan oleh Guru atau Waka.'])
+                    ->withInput();
+            }
+        }
+
         $validated['pic_id'] = $user->id;
         $validated['status'] = $user->isAdmin() ? 'disetujui' : 'diajukan';
 
@@ -130,5 +149,16 @@ class EventController extends Controller
         $decision = $validated['status'] === 'disetujui' ? 'disetujui' : 'ditolak';
 
         return redirect()->route('dashboard')->with('success', 'Pengajuan jadwal berhasil '.$decision.'.');
+    }
+
+    public function destroy(Request $request, Event $event): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->isAdmin() || $event->pic_id === $user->id, 403, 'Anda tidak memiliki hak untuk membatalkan pengajuan ini.');
+
+        $eventName = $event->event_name;
+        $event->delete();
+
+        return back()->with('success', 'Pengajuan kegiatan "'.$eventName.'" berhasil dibatalkan.');
     }
 }
